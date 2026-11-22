@@ -20,6 +20,15 @@ if (isBuild) {
 }
 val patch = ver.getProperty("patch").toInt()
 
+// Chave fixa de release: sem ela o Android recusa instalar uma versão nova por cima da antiga.
+// CI: RM_KEYSTORE + RM_KEYSTORE_PASSWORD. Local: ~/.android/renanmusic-release.jks + .properties.
+val home = File(System.getProperty("user.home"), ".android")
+val keystoreFile = System.getenv("RM_KEYSTORE")?.let(::File) ?: File(home, "renanmusic-release.jks")
+val keystorePassword = System.getenv("RM_KEYSTORE_PASSWORD")
+    ?: File(home, "renanmusic-release.properties").takeIf { it.exists() }
+        ?.let { f -> Properties().apply { f.inputStream().use { load(it) } }.getProperty("storePassword") }
+val hasReleaseKey = keystoreFile.exists() && keystorePassword != null
+
 android {
     namespace = "com.renan.renanmusic"
     compileSdk = 35
@@ -31,6 +40,17 @@ android {
         versionCode = maxOf(patch, 1)
         versionName = "${ver.getProperty("major")}.${ver.getProperty("minor")}.$patch"
         buildConfigField("String", "BUILD_TIME", "\"${ver.getProperty("built")}\"")
+        // Repositório público de onde o app baixa as próprias atualizações (GitHub Releases).
+        buildConfigField("String", "UPDATE_REPO", "\"renanrmsantos14/renanmusic\"")
+    }
+
+    signingConfigs {
+        if (hasReleaseKey) create("release") {
+            storeFile = keystoreFile
+            storePassword = keystorePassword
+            keyAlias = "renanmusic"
+            keyPassword = keystorePassword
+        }
     }
 
     buildTypes {
@@ -38,7 +58,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (hasReleaseKey) "release" else "debug")
         }
     }
     compileOptions {

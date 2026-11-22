@@ -31,6 +31,8 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 class MainActivity : ComponentActivity() {
     private val spectrum = Spectrum()
@@ -72,6 +74,10 @@ private fun Root(player: Player, spectrum: Spectrum) {
         onPauseOrDispose { player.stop(); spectrum.stop() }
     }
 
+    // Procura versão nova ao abrir (no máximo a cada 6 h) e já deixa o APK baixado.
+    LaunchedEffect(Unit) { Updater.check(ctx) }
+    val update by Updater.state.collectAsStateWithLifecycle()
+
     Box(Modifier.fillMaxSize().background(Ink)) {
         if (hasListener) {
             PlayerScreen(player, spectrum)
@@ -85,6 +91,7 @@ private fun Root(player: Player, spectrum: Spectrum) {
             )
         }
         VersionTag(Modifier.align(Alignment.BottomEnd))
+        UpdatePill(update, onInstall = { Updater.install(ctx) }, Modifier.align(Alignment.TopCenter))
     }
 }
 

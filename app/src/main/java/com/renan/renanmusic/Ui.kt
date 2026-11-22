@@ -893,6 +893,39 @@ private fun Button(text: String, onClick: () -> Unit) {
 
 // ---------- Utilidades ----------
 
+/** Aviso discreto no topo quando há versão nova baixada; entra descendo e some ao instalar. */
+@Composable
+fun UpdatePill(update: Update, onInstall: () -> Unit, modifier: Modifier) {
+    val ready = update as? Update.Ready
+    var last by remember { mutableStateOf(ready) }
+    if (ready != null) last = ready
+    AnimatedVisibility(
+        update !is Update.None,
+        modifier.fillMaxWidth().safeDrawingPadding().padding(horizontal = 18.dp, vertical = 10.dp),
+        enter = slideInVertically(spring(dampingRatio = 0.8f, stiffness = 380f)) { -it * 2 } + fadeIn(tween(200, easing = EaseOut)),
+        exit = slideOutVertically(tween(220, easing = EaseOut)) { -it * 2 } + fadeOut(tween(160, easing = EaseOut)),
+    ) {
+        val installing = update is Update.Installing
+        Row(
+            // Ocupa a faixa do cabeçalho inteira: cobre "TOCANDO / tempo" em vez de ficar por cima pela metade.
+            Modifier
+                .fillMaxWidth()
+                .background(Ink, RoundedCornerShape(50))
+                .border(1.dp, Paper.copy(alpha = 0.14f), RoundedCornerShape(50))
+                .clickable(remember { MutableInteractionSource() }, indication = null, enabled = !installing, onClick = onInstall)
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Meta("v${last?.version.orEmpty()} DISPONÍVEL")
+            BasicText(
+                if (installing) "INSTALANDO…" else "ATUALIZAR",
+                style = TextStyle(Paper, 11.sp, FontWeight.Bold, fontFamily = Mono, letterSpacing = 1.sp),
+            )
+        }
+    }
+}
+
 @Composable
 fun VersionTag(modifier: Modifier) {
     BasicText(

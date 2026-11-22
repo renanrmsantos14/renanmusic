@@ -100,6 +100,22 @@ class ScreenshotsTest {
         rule.onRoot().captureRoboImage("../screenshots/0-boas-vindas.png")
     }
 
+    @Test fun update() {
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            Box(Modifier.fillMaxSize().background(Ink)) {
+                PlayerContent(
+                    Track("Noites de Verão", "Marina Sena", cover(0xFF3A1C71.toInt(), 0xFFD76D77.toInt(), 0xFFFFAF7B.toInt()), 214_000),
+                    Playback(true, 81_000, now), true, levels(0.9f), false, {}, {}, {}, {}, {},
+                )
+                UpdatePill(Update.Ready("0.0.12", java.io.File("x.apk")), {}, Modifier.align(Alignment.TopCenter))
+                VersionTag(Modifier.align(Alignment.BottomEnd))
+            }
+        }
+        rule.mainClock.advanceTimeBy(3000)
+        rule.onRoot().captureRoboImage("../screenshots/6-atualizacao.png")
+    }
+
     @Test
     @Config(qualifiers = "w852dp-h393dp-land-xxhdpi")
     fun landscape() = shot(

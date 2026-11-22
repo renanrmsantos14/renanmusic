@@ -1,0 +1,72 @@
+# Deploy automático: todo push na main testa, gera o APK assinado e publica um GitHub Release.
+# O app instalado lê o último release e se atualiza sozinho (Updater.kt).
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # O commit de versão feito pelo próprio CI não dispara outro release.
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Chave de assinatura
+        env:
+          KEYSTORE_B64: ${{ secrets.RM_KEYSTORE_B64 }}
+        run: |
+          test -n "$KEYSTORE_B64" || { echo "Secret RM_KEYSTORE_B64 ausente"; exit 1; }
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "RM_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - name: Testes
+        run: ./gradlew --no-daemon testDebugUnitTest
+
+      - name: APK de release
+        env:
+          RM_KEYSTORE_PASSWORD: ${{ secrets.RM_KEYSTORE_PASSWORD }}
+        run: |
+          ./gradlew --no-daemon assembleRelease
+          V=$(grep -E '^(major|minor|patch)=' version.properties | sort | cut -d= -f2 | paste -sd. -)
+          # sort deixa major, minor, patch em ordem alfabética, que é a ordem certa.
+          echo "VERSION=$V" >> "$GITHUB_ENV"
+          cp app/build/outputs/apk/release/app-release.apk "RenanMusic-v$V.apk"
+
+      - name: Grava a versão na main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add version.properties
+          git commit -m "Versão v$VERSION [skip ci]"
+          git pull --rebase origin main
+          git push origin HEAD:main
+
+      - name: Publica o release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v$VERSION" "RenanMusic-v$VERSION.apk" \
+            --title "RenanMusic v$VERSION" \
+            --notes "Build automático de ${GITHUB_SHA::7}. O app instalado baixa esta versão sozinho." \
+            --latest
