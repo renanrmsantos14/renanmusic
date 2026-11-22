@@ -41,7 +41,8 @@ jobs:
           echo "RM_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
 
       - name: Testes
-        run: ./gradlew --no-daemon testDebugUnitTest
+        # Prints Roborazzi ficam para revisão local (o download do SDK do Robolectric falha no runner).
+        run: ./gradlew --no-daemon testDebugUnitTest --tests "com.renan.renanmusic.UpdaterTest"
 
       - name: APK de release
         env:
