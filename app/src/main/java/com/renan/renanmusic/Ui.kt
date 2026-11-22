@@ -93,6 +93,8 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
+import kotlin.math.roundToInt
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
@@ -369,12 +371,14 @@ fun PlayerContent(
                 }
             }
             val titles: @Composable () -> Unit = {
+                // Base fixa + altura com spring: trocar título de 2 linhas por 1 não dá salto.
                 Box(
-                    Modifier.fillMaxWidth().graphicsLayer {
+                    Modifier.fillMaxWidth().smoothHeight().graphicsLayer {
                         val s = lerp(1f, titleMin, revealState.value)
                         scaleX = s; scaleY = s
                         transformOrigin = TransformOrigin(0f, 1f)
-                    }
+                    },
+                    contentAlignment = Alignment.BottomStart,
                 ) {
                     Titles(shown, titleSize, Modifier.slide(1.25f, 0))
                     incoming?.let { Titles(it, titleSize, Modifier.slide(1.25f, 1)) }
@@ -446,6 +450,24 @@ fun PlayerContent(
             Canvas(Modifier.size(30.dp)) { if (pb.playing) playIcon(Paper) else pauseIcon(Paper) }
         }
         QueueSheet(queue, queueOpen, onClose = { queueOpen = false }, onPick = { onSkipTo(it); queueOpen = false })
+    }
+}
+
+/**
+ * A altura acompanha o conteúdo com spring, ancorada na base e sem recorte
+ * (o carrossel de títulos precisa passar das bordas). Só refaz layout, não recompõe.
+ */
+@Composable
+private fun Modifier.smoothHeight(): Modifier {
+    val scope = rememberCoroutineScope()
+    val height = remember { Animatable(-1f) }
+    return layout { measurable, constraints ->
+        val p = measurable.measure(constraints)
+        val target = p.height.toFloat()
+        if (height.value < 0f) scope.launch { height.snapTo(target) }
+        else if (height.targetValue != target) scope.launch { height.animateTo(target, spring(dampingRatio = 1f, stiffness = 380f)) }
+        val h = if (height.value < 0f) p.height else height.value.roundToInt()
+        layout(p.width, h) { p.place(0, h - p.height) }
     }
 }
 
