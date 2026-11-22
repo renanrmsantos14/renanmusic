@@ -21,11 +21,11 @@ if (isBuild) {
 val patch = ver.getProperty("patch").toInt()
 
 android {
-    namespace = "com.renan.onda"
+    namespace = "com.renan.renanmusic"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.renan.onda"
+        applicationId = "com.renan.renanmusic"
         minSdk = 33
         targetSdk = 35
         versionCode = maxOf(patch, 1)

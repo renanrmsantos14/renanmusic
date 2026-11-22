@@ -1,4 +1,4 @@
-package com.renan.onda
+package com.renan.renanmusic
 
 import android.media.audiofx.Visualizer
 import kotlin.math.hypot

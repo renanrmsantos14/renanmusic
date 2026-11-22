@@ -1,4 +1,4 @@
-package com.renan.onda
+package com.renan.renanmusic
 
 import android.graphics.Bitmap
 import android.os.SystemClock
@@ -74,6 +74,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.withFrameMillis
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.key
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -98,7 +104,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 
-// Direção 01: capa grande, fundo = a própria capa extremamente desfocada, tipografia pesada sem serifa.
+// RenanMusic · Direção 01: capa grande, fundo = a própria capa extremamente desfocada, tipografia pesada sem serifa.
 val Ink = Color(0xFF0E0D0B)
 private val Paper = Color(0xFFF6EFE9)
 private val Muted = Paper.copy(alpha = 0.6f)
@@ -109,6 +115,9 @@ private val ArtShape = RoundedCornerShape(6.dp)
 private val EaseOut = CubicBezierEasing(0.23f, 1f, 0.32f, 1f)
 private val EaseSheet = CubicBezierEasing(0.32f, 0.72f, 0f, 1f)
 private const val HIDE_AFTER_MS = 4000L
+
+/** Identidade da música (não da versão do metadado): mesma faixa com capa nova mantém a camada. */
+private val Track.songKey get() = "$artist|$title"
 
 // ---------- Player ----------
 
@@ -121,7 +130,7 @@ fun PlayerScreen(player: Player, spectrum: Spectrum) {
     val volume by player.volume.collectAsStateWithLifecycle()
     val levels = rememberLevels(spectrum, pb.playing)
     val ctx = LocalContext.current
-    val prefs = remember { ctx.getSharedPreferences("onda", android.content.Context.MODE_PRIVATE) }
+    val prefs = remember { ctx.getSharedPreferences("renanmusic", android.content.Context.MODE_PRIVATE) }
     var lyricsOn by remember { mutableStateOf(prefs.getBoolean("lyrics", false)) }
     val view = LocalView.current
     LaunchedEffect(pb.playing) { view.keepScreenOn = pb.playing }
@@ -131,6 +140,8 @@ fun PlayerScreen(player: Player, spectrum: Spectrum) {
         onPrev = player::previous, onToggle = player::toggle, onNext = player::next,
         queue = queue, onSkipTo = player::skipTo, volume = volume, onVolume = player::setVolume,
         lyricsOn = lyricsOn, onLyricsToggle = { lyricsOn = !lyricsOn; prefs.edit().putBoolean("lyrics", lyricsOn).apply() },
+        onLike = player::toggleLike,
+        onResume = { if (!player.resume()) player.openSpotify() },
     )
 }
 
@@ -156,6 +167,8 @@ fun PlayerContent(
     onVolume: (Float) -> Unit = {},
     lyricsOn: Boolean = false,
     onLyricsToggle: () -> Unit = {},
+    onLike: () -> Unit = {},
+    onResume: () -> Unit = {},
 ) {
     var controls by remember { mutableStateOf(initialControls) }
     var queueOpen by remember { mutableStateOf(false) }
@@ -164,7 +177,8 @@ fun PlayerContent(
     LaunchedEffect(controls, touch) {
         if (controls && !initialControls) { delay(HIDE_AFTER_MS); controls = false }
     }
-    val pos = rememberPosition(pb)
+    val framePos = rememberPosition(pb)
+    val pos by remember { derivedStateOf { framePos.value / 250 * 250 } }
     val lyrics by produceState(emptyList<LyricLine>(), track.title, track.artist, lyricsOn) {
         value = emptyList()
         if (lyricsOn) value = Lyrics.fetch(track.title, track.artist, track.duration)
@@ -188,7 +202,7 @@ fun PlayerContent(
     var flash by remember { mutableIntStateOf(0) }
     val flashT = remember { Animatable(0f) }
     var pressed by remember { mutableStateOf(false) }
-    val pressScale by animateFloatAsState(if (pressed) 0.985f else 1f, spring(dampingRatio = 0.9f, stiffness = 900f), label = "press")
+    val pressScale = animateFloatAsState(if (pressed) 0.985f else 1f, spring(dampingRatio = 0.9f, stiffness = 900f), label = "press")
     LaunchedEffect(flash) {
         if (flash == 0) return@LaunchedEffect
         flashT.snapTo(0f)
@@ -197,7 +211,8 @@ fun PlayerContent(
         flashT.animateTo(0f, tween(240, easing = EaseOut))
     }
 
-    fun commit() { incoming?.let { shown = it }; incoming = null; pending = 0; scope.launch { dragX.snapTo(0f) } }
+    // Troca de camada e volta ao centro no mesmo frame: nunca aparece um quadro vazio entre as faixas.
+    suspend fun commit() { dragX.snapTo(0f); incoming?.let { shown = it }; incoming = null; pending = 0 }
     fun skip(dir: Int, velocity: Float = 0f) {
         // "Anterior" depois de 3 s só reinicia a faixa: a capa recua e volta ao centro, sem sair da tela.
         val restart = dir < 0 && pos > 3000
@@ -223,7 +238,17 @@ fun PlayerContent(
                 incoming = track
                 if (!dragX.isRunning) commit() // os metadados chegaram depois do movimento: só troca a camada
             }
-            else -> shown = track // troca feita pelo próprio Spotify (fim da faixa, outro aparelho)
+            // Mesma música (capa chegou depois, posição mudou) ou movimento reduzido: troca direta.
+            reduced || shown.title.isEmpty() || shown.songKey == track.songKey -> shown = track
+            else -> {
+                // Troca feita pelo próprio Spotify (fim da faixa, outro aparelho): entra pelo mesmo carrossel.
+                // Roda no escopo da tela para um novo metadado da mesma faixa não cortar o movimento no meio.
+                incoming = track; pending = 1
+                scope.launch {
+                    dragX.animateTo(-travel, spring(dampingRatio = 1f, stiffness = 200f))
+                    if (incoming != null) commit()
+                }
+            }
         }
     }
     LaunchedEffect(pending) { // player não respondeu: volta ao centro sem travar a tela
@@ -232,7 +257,7 @@ fun PlayerContent(
         if (incoming == null) { pending = 0; dragX.animateTo(0f, spring(dampingRatio = 0.86f, stiffness = 240f)) }
     }
 
-    val reveal by animateFloatAsState(
+    val revealState = animateFloatAsState(
         if (controls) 1f else 0f,
         spring(dampingRatio = 0.9f, stiffness = 520f),
         label = "reveal",
@@ -248,6 +273,12 @@ fun PlayerContent(
                 detectTapGestures(
                     onPress = { pressed = true; tryAwaitRelease(); pressed = false },
                     onTap = { controls = !controls },
+                    onLongPress = {
+                        if (connected) {
+                            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                            onOpen() // abre a faixa atual no Spotify
+                        }
+                    },
                     onDoubleTap = {
                         if (connected) {
                             view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
@@ -311,13 +342,16 @@ fun PlayerContent(
     ) {
         Backdrop(track.art)
         if (!connected) {
-            Idle(onOpen)
+            Idle(onResume, onOpen)
             return@Box
         }
         BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
             val landscape = maxWidth > maxHeight
             val pad = if (landscape) 40.dp else 32.dp
-            val titleSize = if (landscape) lerp(58f, 44f, reveal) else lerp(52f, 40f, reveal)
+            // Título com tamanho fixo e escala na camada de desenho: nenhuma remedição de texto por frame.
+            val titleSize = if (landscape) 58f else 52f
+            val titleMin = if (landscape) 44f / 58f else 40f / 52f
+            val reveal = { revealState.value }
             // Camada 0 = faixa atual, camada 1 = faixa que chega (um travel adiante, do lado para onde o dedo foi).
             fun Modifier.slide(depth: Float, layer: Int) = graphicsLayer {
                 val x = dragX.value + layer * pending * travel
@@ -327,15 +361,21 @@ fun PlayerContent(
                 val sc = 1f - 0.06f * p
                 scaleX = sc; scaleY = sc
             }
-            val artBase = lerp(1f, 0.96f, reveal) * pressScale
             val art: @Composable (Modifier) -> Unit = { m ->
-                Box(m.aspectRatio(1f).graphicsLayer { scaleX = artBase; scaleY = artBase }) {
-                    Art(shown.art, Modifier.slide(1f, 0))
-                    incoming?.let { Art(it.art, Modifier.slide(1f, 1)) }
+                Box(m.aspectRatio(1f).graphicsLayer { val s = lerp(1f, 0.96f, revealState.value) * pressScale.value; scaleX = s; scaleY = s }) {
+                    // key por faixa: a capa só faz crossfade quando chega atrasada para a MESMA música.
+                    key(shown.songKey) { Art(shown.art, Modifier.slide(1f, 0)) }
+                    incoming?.let { key(it.songKey) { Art(it.art, Modifier.slide(1f, 1)) } }
                 }
             }
             val titles: @Composable () -> Unit = {
-                Box(Modifier.fillMaxWidth()) {
+                Box(
+                    Modifier.fillMaxWidth().graphicsLayer {
+                        val s = lerp(1f, titleMin, revealState.value)
+                        scaleX = s; scaleY = s
+                        transformOrigin = TransformOrigin(0f, 1f)
+                    }
+                ) {
                     Titles(shown, titleSize, Modifier.slide(1.25f, 0))
                     incoming?.let { Titles(it, titleSize, Modifier.slide(1.25f, 1)) }
                 }
@@ -353,7 +393,7 @@ fun PlayerContent(
                     Column {
                         Spacer(Modifier.height(26.dp))
                         Box(Modifier.stagger(reveal, 0f)) {
-                            Progress(pb, pos, track.duration, onSeek = { poke(); onSeek(it) }, onDrag = poke)
+                            Progress({ framePos.value }, track.duration, onSeek = { poke(); onSeek(it) }, onDrag = poke)
                         }
                         Spacer(Modifier.height(6.dp))
                         Controls(
@@ -361,6 +401,7 @@ fun PlayerContent(
                             onPrev = { poke(); skip(-1) }, onToggle = { poke(); onToggle() }, onNext = { poke(); skip(1) },
                             onQueue = { poke(); queueOpen = true },
                             lyricsOn = lyricsOn, onLyrics = { poke(); onLyricsToggle() },
+                            like = pb.like, onLike = { poke(); onLike() },
                         )
                     }
                 }
@@ -387,7 +428,7 @@ fun PlayerContent(
             VolumeIndicator(volume, volumeShown, Modifier.align(Alignment.CenterEnd).padding(end = 10.dp))
         }
         // Com controles ocultos, o progresso vira um fio na borda inferior da tela.
-        Thread(pos, track.duration, 1f - reveal, Modifier.align(Alignment.BottomStart))
+        Thread({ framePos.value }, track.duration, { 1f - revealState.value }, Modifier.align(Alignment.BottomStart))
         Box(
             Modifier
                 .align(Alignment.Center)
@@ -409,8 +450,8 @@ fun PlayerContent(
 }
 
 /** Entrada escalonada: cada elemento sobe e aparece um pouco depois do anterior. */
-private fun Modifier.stagger(reveal: Float, delay: Float) = graphicsLayer {
-    val r = ((reveal - delay) / (1f - delay)).coerceIn(0f, 1f)
+private fun Modifier.stagger(reveal: () -> Float, delay: Float) = graphicsLayer {
+    val r = ((reveal() - delay) / (1f - delay)).coerceIn(0f, 1f)
     alpha = r
     translationY = (1f - r) * 14.dp.toPx()
 }
@@ -454,13 +495,16 @@ private fun Meta(text: String, modifier: Modifier = Modifier) = BasicText(
 )
 
 @Composable
-private fun Idle(onOpen: () -> Unit) {
+private fun Idle(onResume: () -> Unit, onOpen: () -> Unit) {
     Column(Modifier.fillMaxSize().safeDrawingPadding().padding(40.dp), verticalArrangement = Arrangement.Bottom) {
         Meta("SILÊNCIO")
         Spacer(Modifier.height(12.dp))
         BasicText("Nada tocando.", style = TextStyle(Paper, 48.sp, FontWeight.Bold, fontFamily = Sans, letterSpacing = (-2).sp, lineHeight = 48.sp))
         Spacer(Modifier.height(28.dp))
-        Button("Abrir Spotify", onOpen)
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Button("Retomar no Spotify", onResume)
+            Meta("ABRIR", Modifier.clickable(onClick = onOpen).padding(horizontal = 8.dp, vertical = 14.dp))
+        }
     }
 }
 
@@ -489,9 +533,11 @@ private fun Titles(track: Track, size: Float, modifier: Modifier) {
 @Composable
 private fun Art(art: Bitmap?, modifier: Modifier) {
     Box(modifier.fillMaxSize().clip(ArtShape).background(Paper.copy(alpha = 0.08f))) {
-        if (art != null) {
-            val img = remember(art) { art.asImageBitmap() }
-            Image(img, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        Crossfade(art, animationSpec = tween(280, easing = EaseOut), label = "art") { a ->
+            if (a != null) {
+                val img = remember(a) { a.asImageBitmap() }
+                Image(img, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            }
         }
     }
 }
@@ -621,7 +667,8 @@ private fun rememberLevels(spectrum: Spectrum, playing: Boolean): Levels {
                 levels.bass = (levels.v[0] + levels.v[1] + levels.v[2] + levels.v[3]) / 4f
                 levels.tick.longValue = t
             }
-            if (!isPlaying && levels.bass < 0.002f) delay(120) // parado: poupa bateria
+            // Parado ou sem captura de áudio: nada a animar, poupa bateria.
+            if (levels.bass < 0.002f && (!isPlaying || spectrum.bands.all { it == 0f })) delay(120)
         }
     }
     return levels
@@ -629,32 +676,34 @@ private fun rememberLevels(spectrum: Spectrum, playing: Boolean): Levels {
 
 // ---------- Progresso ----------
 
+/** Posição estimada a cada frame. Lida só no desenho (barra e fio), então anda liso sem recompor a tela. */
 @Composable
-private fun rememberPosition(pb: Playback): Long {
-    val now by produceState(SystemClock.elapsedRealtime(), pb) {
-        while (true) {
-            value = SystemClock.elapsedRealtime()
-            delay(if (pb.playing) 250 else 1000)
-        }
+private fun rememberPosition(pb: Playback): State<Long> {
+    val pos = remember { mutableLongStateOf(pb.position) }
+    LaunchedEffect(pb) {
+        fun estimate() = if (pb.playing) pb.position + ((SystemClock.elapsedRealtime() - pb.updatedAt) * pb.speed).toLong() else pb.position
+        pos.longValue = estimate()
+        while (pb.playing) withFrameMillis { pos.longValue = estimate() }
     }
-    return if (pb.playing) pb.position + ((now - pb.updatedAt) * pb.speed).toLong() else pb.position
+    return pos
 }
 
 /** Fio de 3dp colado na borda inferior: só aparece com os controles ocultos. */
 @Composable
-private fun Thread(pos: Long, duration: Long, alpha: Float, modifier: Modifier) {
-    Canvas(modifier.fillMaxWidth().height(3.dp).graphicsLayer { this.alpha = alpha }) {
-        val frac = if (duration > 0) (pos.toFloat() / duration).coerceIn(0f, 1f) else 0f
+private fun Thread(pos: () -> Long, duration: Long, alpha: () -> Float, modifier: Modifier) {
+    Canvas(modifier.fillMaxWidth().height(3.dp).graphicsLayer { this.alpha = alpha() }) {
+        val frac = if (duration > 0) (pos().toFloat() / duration).coerceIn(0f, 1f) else 0f
         drawRect(Paper.copy(alpha = 0.14f))
         drawRect(Paper, size = Size(size.width * frac, size.height))
     }
 }
 
 @Composable
-private fun Progress(pb: Playback, pos: Long, duration: Long, onSeek: (Long) -> Unit, onDrag: () -> Unit) {
+private fun Progress(pos: () -> Long, duration: Long, onSeek: (Long) -> Unit, onDrag: () -> Unit) {
     var drag by remember { mutableStateOf<Float?>(null) }
-    val frac = drag ?: if (duration > 0) (pos.toFloat() / duration).coerceIn(0f, 1f) else 0f
     val view = LocalView.current
+    // Marcador cresce com spring ao segurar, em vez de pular de 16 para 20 dp.
+    val grab by animateFloatAsState(if (drag != null) 1f else 0f, spring(dampingRatio = 0.7f, stiffness = 700f), label = "grab")
     Canvas(
         Modifier
             .fillMaxWidth()
@@ -672,12 +721,13 @@ private fun Progress(pb: Playback, pos: Long, duration: Long, onSeek: (Long) -> 
                 ) { change, _ -> onDrag(); drag = (change.position.x / size.width).coerceIn(0f, 1f) }
             }
     ) {
+        val frac = drag ?: if (duration > 0) (pos().toFloat() / duration).coerceIn(0f, 1f) else 0f
         val y = size.height / 2
         val h = 2.dp.toPx()
         drawRect(Paper.copy(alpha = 0.18f), Offset(0f, y - h / 2), Size(size.width, h))
         drawRect(Paper, Offset(0f, y - h / 2), Size(size.width * frac, h))
         val mw = 2.dp.toPx()
-        val mh = (if (drag != null) 20 else 16).dp.toPx()
+        val mh = (16 + 4 * grab).dp.toPx()
         drawRect(Paper, Offset(size.width * frac - mw / 2, y - mh / 2), Size(mw, mh))
     }
 }
@@ -691,9 +741,10 @@ private fun clock(ms: Long): String {
 
 @Composable
 private fun Controls(
-    playing: Boolean, landscape: Boolean, reveal: Float,
+    playing: Boolean, landscape: Boolean, reveal: () -> Float,
     onPrev: () -> Unit, onToggle: () -> Unit, onNext: () -> Unit, onQueue: () -> Unit,
     lyricsOn: Boolean, onLyrics: () -> Unit,
+    like: LikeAction? = null, onLike: () -> Unit = {},
 ) {
     val view = LocalView.current
     Row(
@@ -707,12 +758,21 @@ private fun Controls(
         }
         Press(onNext, Modifier.stagger(reveal, 0.35f)) { Canvas(Modifier.size(20.dp)) { skipIcon(Paper, flip = false) } }
         if (landscape) Spacer(Modifier.weight(1f))
+        if (like != null) {
+            // Curtir no Spotify: o coração enche com um pulso curto (sobe e volta ao tamanho normal).
+            val pop by animateFloatAsState(if (like.liked) 1f else 0f, spring(dampingRatio = 0.5f, stiffness = 500f), label = "like")
+            Press({ view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK); onLike() }, Modifier.stagger(reveal, 0.4f), size = 48.dp) {
+                Canvas(Modifier.size(20.dp).graphicsLayer { val s = 1f + 0.72f * pop * (1f - pop); scaleX = s; scaleY = s }) {
+                    heartIcon(Paper, filled = like.liked)
+                }
+            }
+        }
         BasicText(
             "LETRA",
             Modifier
                 .stagger(reveal, 0.45f)
                 .clickable(remember { MutableInteractionSource() }, indication = null, onClick = onLyrics)
-                .padding(horizontal = 12.dp, vertical = 20.dp),
+                .padding(horizontal = if (like != null) 8.dp else 12.dp, vertical = 20.dp),
             style = TextStyle(if (lyricsOn) Paper else Paper.copy(alpha = 0.45f), 11.sp, fontFamily = Mono, letterSpacing = 1.sp),
         )
         Meta(
@@ -720,20 +780,20 @@ private fun Controls(
             Modifier
                 .stagger(reveal, 0.55f)
                 .clickable(remember { MutableInteractionSource() }, indication = null, onClick = onQueue)
-                .padding(horizontal = 18.dp, vertical = 20.dp),
+                .padding(horizontal = if (like != null) 8.dp else 18.dp, vertical = 20.dp),
         )
     }
 }
 
 /** Feedback no toque (press-in), ação no soltar. Escala sutil, sem ripple. Alvo de 56dp. */
 @Composable
-private fun Press(onClick: () -> Unit, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+private fun Press(onClick: () -> Unit, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 56.dp, content: @Composable () -> Unit) {
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.9f else 1f, tween(120, easing = EaseOut), label = "press")
     Box(
         modifier
-            .size(56.dp)
+            .size(size)
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) 0.6f else 1f }
             .clickable(source, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -743,6 +803,19 @@ private fun Press(onClick: () -> Unit, modifier: Modifier = Modifier, content: @
 private fun DrawScope.playIcon(c: Color) {
     val w = size.width; val h = size.height
     drawPath(Path().apply { moveTo(w * 0.2f, h * 0.1f); lineTo(w * 0.9f, h * 0.5f); lineTo(w * 0.2f, h * 0.9f); close() }, c)
+}
+
+private fun DrawScope.heartIcon(c: Color, filled: Boolean) {
+    val w = size.width; val h = size.height
+    val p = Path().apply {
+        moveTo(w * 0.5f, h * 0.88f)
+        cubicTo(w * 0.1f, h * 0.6f, w * 0.0f, h * 0.36f, w * 0.12f, h * 0.2f)
+        cubicTo(w * 0.26f, h * 0.02f, w * 0.46f, h * 0.1f, w * 0.5f, h * 0.28f)
+        cubicTo(w * 0.54f, h * 0.1f, w * 0.74f, h * 0.02f, w * 0.88f, h * 0.2f)
+        cubicTo(w * 1.0f, h * 0.36f, w * 0.9f, h * 0.6f, w * 0.5f, h * 0.88f)
+        close()
+    }
+    if (filled) drawPath(p, c) else drawPath(p, c, style = Stroke(width = 1.6.dp.toPx()))
 }
 
 private fun DrawScope.pauseIcon(c: Color) {
@@ -770,7 +843,7 @@ fun Onboarding(
     Column(Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 32.dp, vertical = 28.dp), verticalArrangement = Arrangement.Bottom) {
         Meta("VISUALIZADOR")
         Spacer(Modifier.height(10.dp))
-        BasicText("onda", style = TextStyle(Paper, 64.sp, FontWeight.Bold, fontFamily = Sans, letterSpacing = (-3).sp, lineHeight = 64.sp))
+        BasicText("RenanMusic", style = TextStyle(Paper, 52.sp, FontWeight.Bold, fontFamily = Sans, letterSpacing = (-2.2).sp, lineHeight = 54.sp))
         Spacer(Modifier.height(12.dp))
         BasicText("A capa do que está tocando, em tela cheia.", style = TextStyle(Muted, 16.sp, fontFamily = Sans, lineHeight = 24.sp))
         Spacer(Modifier.height(48.dp))

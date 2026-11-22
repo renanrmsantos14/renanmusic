@@ -1,4 +1,4 @@
-package com.renan.onda
+package com.renan.renanmusic
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -46,6 +46,8 @@ class ScreenshotsTest {
     }
 
     private fun shot(name: String, track: Track, pb: Playback, connected: Boolean = true, energy: Float = 0.9f, controls: Boolean = false) {
+        // A posição anda a cada frame enquanto toca: o relógio do teste avança só à mão.
+        rule.mainClock.autoAdvance = false
         rule.setContent {
             Box(Modifier.fillMaxSize().background(Ink)) {
                 PlayerContent(track, pb, connected, levels(energy), false, {}, {}, {}, {}, {}, initialControls = controls)
@@ -82,7 +84,7 @@ class ScreenshotsTest {
     @Test fun sunsetControls() = shot(
         "1b-tocando-controles",
         Track("Noites de Verão", "Marina Sena", cover(0xFF3A1C71.toInt(), 0xFFD76D77.toInt(), 0xFFFFAF7B.toInt()), 214_000),
-        Playback(true, 81_000, now),
+        Playback(true, 81_000, now, like = LikeAction("spotify-like", liked = true)),
         controls = true,
     )
 
