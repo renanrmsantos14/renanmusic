@@ -1,16 +1,16 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <!-- RenanMusic: o disco saindo da capa (o app é a capa do que está tocando). -->
-    <!-- Vinil -->
-    <path android:fillColor="#1E1C1A" android:strokeColor="#F6EFE9" android:strokeWidth="1.6"
-        android:pathData="M49,54 a17,17 0 1,0 34,0 a17,17 0 1,0 -34,0" />
-    <path android:strokeColor="#F6EFE9" android:strokeAlpha="0.28" android:strokeWidth="0.9"
-        android:pathData="M53.5,54 a12.5,12.5 0 1,0 25,0 a12.5,12.5 0 1,0 -25,0 M57.5,54 a8.5,8.5 0 1,0 17,0 a8.5,8.5 0 1,0 -17,0" />
-    <path android:fillColor="#FFAF7B" android:pathData="M61,54 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0" />
-    <path android:fillColor="#0E0D0B" android:pathData="M64.8,54 a1.2,1.2 0 1,0 2.4,0 a1.2,1.2 0 1,0 -2.4,0" />
-    <!-- Capa -->
-    <path android:fillColor="#D76D77" android:pathData="M30.5,37 h29 a2.5,2.5 0 0 1 2.5,2.5 v29 a2.5,2.5 0 0 1 -2.5,2.5 h-29 a2.5,2.5 0 0 1 -2.5,-2.5 v-29 a2.5,2.5 0 0 1 2.5,-2.5 z" />
-    <path android:fillColor="#FFE4CC" android:pathData="M42,49 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
-    <path android:strokeColor="#FFE4CC" android:strokeAlpha="0.75" android:strokeWidth="2.4" android:strokeLineCap="round"
-        android:pathData="M34,62 L56,62" />
+    <!-- RenanMusic: só o disco de vinil, centralizado. -->
+    <path android:fillColor="#1E1C1A" android:strokeColor="#F6EFE9" android:strokeWidth="1.8"
+        android:pathData="M28,54 a26,26 0 1,0 52,0 a26,26 0 1,0 -52,0" />
+    <!-- Sulcos -->
+    <path android:strokeColor="#F6EFE9" android:strokeAlpha="0.22" android:strokeWidth="0.9"
+        android:pathData="M33,54 a21,21 0 1,0 42,0 a21,21 0 1,0 -42,0 M37.5,54 a16.5,16.5 0 1,0 33,0 a16.5,16.5 0 1,0 -33,0" />
+    <!-- Reflexo -->
+    <path android:strokeColor="#F6EFE9" android:strokeAlpha="0.55" android:strokeWidth="1.6" android:strokeLineCap="round"
+        android:pathData="M39,39 A21,21 0 0 1 54,33 M69,69 A21,21 0 0 1 54,75" />
+    <!-- Selo -->
+    <path android:fillColor="#D76D77" android:pathData="M44,54 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0" />
+    <path android:fillColor="#FFAF7B" android:pathData="M48,54 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" />
+    <path android:fillColor="#0E0D0B" android:pathData="M52.2,54 a1.8,1.8 0 1,0 3.6,0 a1.8,1.8 0 1,0 -3.6,0" />
 </vector>
