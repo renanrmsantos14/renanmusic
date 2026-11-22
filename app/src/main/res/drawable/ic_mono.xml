@@ -1,9 +1,10 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <!-- Versão monocromática (ícone temático do Android): mesmas formas, só silhueta. -->
-    <path android:strokeColor="#FFFFFF" android:strokeWidth="2.4"
-        android:pathData="M49,54 a17,17 0 1,0 34,0 a17,17 0 1,0 -34,0" />
-    <path android:fillColor="#FFFFFF" android:pathData="M61,54 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0" />
+    <!-- Versão monocromática (ícone temático): disco com sulco e selo vazado. -->
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="2.6"
+        android:pathData="M28,54 a26,26 0 1,0 52,0 a26,26 0 1,0 -52,0" />
+    <path android:strokeColor="#FFFFFF" android:strokeAlpha="0.5" android:strokeWidth="1.4"
+        android:pathData="M35,54 a19,19 0 1,0 38,0 a19,19 0 1,0 -38,0" />
     <path android:fillColor="#FFFFFF" android:fillType="evenOdd"
-        android:pathData="M30.5,37 h29 a2.5,2.5 0 0 1 2.5,2.5 v29 a2.5,2.5 0 0 1 -2.5,2.5 h-29 a2.5,2.5 0 0 1 -2.5,-2.5 v-29 a2.5,2.5 0 0 1 2.5,-2.5 z M42,49 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0 z M34,61 h22 v2.4 h-22 z" />
+        android:pathData="M44,54 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0 z M52.2,54 a1.8,1.8 0 1,0 3.6,0 a1.8,1.8 0 1,0 -3.6,0 z" />
 </vector>
