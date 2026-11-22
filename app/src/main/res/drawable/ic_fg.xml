@@ -1,8 +1,16 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <!-- Monograma R do RenanMusic: haste, bojo e perna, com uma barra de nível ao lado. -->
-    <path android:strokeColor="#FFFFFF" android:strokeWidth="6" android:strokeLineCap="round" android:strokeLineJoin="round"
-        android:pathData="M38,34 L38,74 M38,34 L52,34 A10,10 0 0 1 52,54 L38,54 M48,54 L60,74" />
-    <path android:strokeColor="#FFFFFF" android:strokeWidth="6" android:strokeLineCap="round"
-        android:pathData="M72,50 L72,74" />
+    <!-- RenanMusic: o disco saindo da capa (o app é a capa do que está tocando). -->
+    <!-- Vinil -->
+    <path android:fillColor="#1E1C1A" android:strokeColor="#F6EFE9" android:strokeWidth="1.6"
+        android:pathData="M49,54 a17,17 0 1,0 34,0 a17,17 0 1,0 -34,0" />
+    <path android:strokeColor="#F6EFE9" android:strokeAlpha="0.28" android:strokeWidth="0.9"
+        android:pathData="M53.5,54 a12.5,12.5 0 1,0 25,0 a12.5,12.5 0 1,0 -25,0 M57.5,54 a8.5,8.5 0 1,0 17,0 a8.5,8.5 0 1,0 -17,0" />
+    <path android:fillColor="#FFAF7B" android:pathData="M61,54 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0" />
+    <path android:fillColor="#0E0D0B" android:pathData="M64.8,54 a1.2,1.2 0 1,0 2.4,0 a1.2,1.2 0 1,0 -2.4,0" />
+    <!-- Capa -->
+    <path android:fillColor="#D76D77" android:pathData="M30.5,37 h29 a2.5,2.5 0 0 1 2.5,2.5 v29 a2.5,2.5 0 0 1 -2.5,2.5 h-29 a2.5,2.5 0 0 1 -2.5,-2.5 v-29 a2.5,2.5 0 0 1 2.5,-2.5 z" />
+    <path android:fillColor="#FFE4CC" android:pathData="M42,49 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
+    <path android:strokeColor="#FFE4CC" android:strokeAlpha="0.75" android:strokeWidth="2.4" android:strokeLineCap="round"
+        android:pathData="M34,62 L56,62" />
 </vector>
