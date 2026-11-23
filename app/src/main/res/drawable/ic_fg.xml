@@ -10,7 +10,7 @@
     <path android:strokeColor="#F6EFE9" android:strokeAlpha="0.55" android:strokeWidth="1.6" android:strokeLineCap="round"
         android:pathData="M39,39 A21,21 0 0 1 54,33 M69,69 A21,21 0 0 1 54,75" />
     <!-- Selo -->
-    <path android:fillColor="#D76D77" android:pathData="M44,54 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0" />
-    <path android:fillColor="#FFAF7B" android:pathData="M48,54 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" />
+    <path android:fillColor="#2F5BEA" android:pathData="M44,54 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0" />
+    <path android:fillColor="#7EA2FF" android:pathData="M48,54 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" />
     <path android:fillColor="#0E0D0B" android:pathData="M52.2,54 a1.8,1.8 0 1,0 3.6,0 a1.8,1.8 0 1,0 -3.6,0" />
 </vector>
